@@ -17,7 +17,7 @@ def approximate_koopman(X, Y, sigma2):
        Mu: Koopman eigen values
        phi_end: Koopman eigen functions
     '''
-
+    pass
     
 
 
