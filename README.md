@@ -17,7 +17,7 @@ pip install -r requirements.txt
 
 ## Data
 
-F4M1 and Pleth signals are in the repository in their respective CSV files. Not sure why HT included `dataset.zip`, it contains a lot more Pleth and F4M1 signals. It's a big file.
+https://www.dropbox.com/sh/8d1mkp0ftsa0qj1/AADYKkZm99pXNSZ29vhRTjcea?dl=0
 
 ## Tasks
 
