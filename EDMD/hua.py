@@ -2,7 +2,7 @@
 
 import math
 import numpy as np
-import scipy
+from scipy.spatial import distance
 
 
 def approximate_koopman(x, y, sigma_2):
@@ -19,13 +19,13 @@ def approximate_koopman(x, y, sigma_2):
        phi_end: Koopman eigen functions
     '''
 
-    m = np.size(x, 1)
+    m = np.size(x, 0)
     
     Uxy = np.vstack([x, y])
 
-    tmp = scipy.pdist(Uxy)
-
-    Uga = math.exp(-1/sigma_2 * scipy.squareform(tmp))
+    tmp = distance.pdist(Uxy)
+    
+    Uga = np.exp(-1/sigma_2 * distance.squareform(tmp))
     Uga = Uga[:, 0:m]
 
     Ghat = Uga[0:m, :]
@@ -37,14 +37,13 @@ def approximate_koopman(x, y, sigma_2):
     SigmaPINV = 1./np.sqrt(sigma2)
 
     Mtmp = Q * np.transpose(SigmaPINV)
-
-    KoopMat = np.transpose(Mtmp) * Ahat * Mtmp
+    KoopMat = np.transpose(Mtmp) @ Ahat @ Mtmp
 
     mu, Vhat = np.linalg.eig(KoopMat)
 
-    Phixy = Uga * Mtmp * Vhat
+    Phixy = Uga @ Mtmp @ Vhat
 
-    xi = np.linalg.pinv(Phixy) * Uxy
+    xi = np.linalg.pinv(Phixy) @ Uxy
 
     phi_end = Phixy[-1, :]
 
