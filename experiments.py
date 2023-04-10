@@ -66,8 +66,30 @@ def calcMetrics(xhat,x):
 
     return mse,l2,linf
 
-def plotMetrics():
-    pass
+def plotMetrics(listOfMetrics):
+
+    #plt.rcParams["text.usetex"] = True
+    mses = [ls[0] for ls in listOfMetrics]
+    l2s = [ls[1] for ls in listOfMetrics]
+    linfs = [ls[2] for ls in listOfMetrics]
+    
+
+    fig,axs = plt.subplots(nrows=1,ncols=1,figsize=(10,10))
+
+    meanMSE = np.nanmean(mses)
+    sdMSE = np.nanmean(mses)
+    meanl2s = np.nanmean(l2s)
+    sdl2s = np.nanmean(l2s)
+    meanInfs = np.nanmean(linfs)
+    sdInfs = np.nanmean(linfs)
+
+    axs.errorbar([0,1,2],[meanMSE,meanl2s,meanInfs],\
+                    yerr=[sdMSE,sdl2s,sdInfs])
+    axs.set_xticklabels(["MSE","L2", "LInf"])
+    axs.set_ylabel("Error")
+
+    plt.savefig("C:\\Users\\mmart\\Downloads\\losses.png")
+
 
 def forecast(x,L,HOP,extK,extM):
 
@@ -153,9 +175,11 @@ if __name__ == "__main__":
         metrics = calcMetrics(xExt,seg['test']) 
         eegStats.append(metrics)
 
+    plotMetrics(eegStats)
     for seg in plethData:
 
         xExt = forecast(seg['train'],L,HOP,extK,extM)
 
         metrics = calcMetrics(xExt,seg['test']) 
         plethStats.append(metrics)
+    plotMetrics(plethStats)
