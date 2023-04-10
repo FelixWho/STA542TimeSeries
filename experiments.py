@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+import time
 
 from EDMD.hua import approximate_koopman
 
@@ -88,7 +89,7 @@ def plotMetrics(listOfMetrics):
     axs.set_xticklabels(["MSE","L2", "LInf"])
     axs.set_ylabel("Error")
 
-    plt.savefig("C:\\Users\\mmart\\Downloads\\losses.png")
+    plt.savefig("test.png")
 
 
 def forecast(x,L,HOP,extK,extM):
@@ -106,23 +107,10 @@ def forecast(x,L,HOP,extK,extM):
     #x = np.hstack([xTrain,xTest])
     
 
-    ## of length at least extM+ 2*extK
+    ## of length at least extM + extK
     for kk in range(extK):
         start = -extK - extM +kk
         end = kk - extK
-        #print(start)
-        #print(end)
-        #
-        #### TO DO ####
-        # fix this part.
-        ###############
-        #print(start)
-        #print(end)
-        #print(x.shape)
-        data = x[start:end:HOP]
-        #if len(data) < extM: print(kk)
-        #print(HOP)
-
         X[:,kk] = x[start:end:HOP]
 
 
@@ -133,13 +121,16 @@ def forecast(x,L,HOP,extK,extM):
     
     [Xi,mu,phix] = approximate_koopman(X,Y,sigma2)
 
+    # X = [x1 x2 x3 ... ]
+    # Z = [x1' x2' x3'...]
     Z = np.zeros((round(np.ceil(extM/HOP)),L))
     tmp = phix.T
     for kk in range(L):
         tmp = mu * tmp
         Z[:,kk] = tmp
-    Z = np.real(Xi.T @ Z)
-    xext = Z[-1,:].T
+
+    P = np.real(Xi.T @ Z)
+    xext = P[-1,:].T
 
     return xext
 
@@ -147,15 +138,15 @@ def forecast(x,L,HOP,extK,extM):
 if __name__ == "__main__":
 
     
-    timeEEG,sigEEG,fsEEG = loadData("F4M1.csv") 
-    timePleth,sigPleth,fsPleth = loadData("Pleth.csv") 
+    timeEEG,sigEEG,fsEEG = loadData("F4M1.csv")
+    timePleth,sigPleth,fsPleth = loadData("Pleth.csv")
     
     HOP = 1
     extSEC = 5 # extension length in seconds
     assert fsPleth == fsEEG
     L = round(extSEC * fsEEG)
     extM = round(1.5 * L)
-    extK = round( 2.5*extM ) # number of points to estimate A / size of datasets
+    extK = round( 2.5 * extM ) # number of points to estimate A / size of datasets
     extKSecs = ( extK/fsEEG )
     extMSecs = (extM/fsEEG)
     eegData = splitData(timeEEG,sigEEG,fsEEG,\
@@ -170,7 +161,9 @@ if __name__ == "__main__":
 
     for seg in eegData:
 
+        start_time = time.time()
         xExt = forecast(seg['train'],L,HOP,extK,extM)
+        print(f"TIME TAKEN: {time.time() -  start_time}")
 
         metrics = calcMetrics(xExt,seg['test']) 
         eegStats.append(metrics)
