@@ -19,7 +19,7 @@ def loadData(filepath):
 
     return time,signal, fs
 
-def splitData(time,signal,fs,num_segments = 10, train_segment_length = 6,test_segment_length=1):
+def splitData(time,signal,fs,num_segments = 5, train_segment_length = 6,test_segment_length=1):
     """ 
     takes in time, signal, and sampling rate of data as first arguments
     also takes in: number of train/test segments we want (integer)
@@ -30,19 +30,24 @@ def splitData(time,signal,fs,num_segments = 10, train_segment_length = 6,test_se
 
     nPoints = len(signal)
     maxStartInd = nPoints - int((train_segment_length + test_segment_length)*fs)
-
+    #print(fs)
+    #print(nPoints)
     for segs in range(num_segments):
 
         data = {}
 
         start = np.random.choice(maxStartInd,1)[0]
-        
+        #print(start)
         endTrain = start + int(train_segment_length*fs)
+        #print(train_segment_length * fs)
+        #print(endTrain)
         endTest = endTrain + int(test_segment_length*fs)
         
         trainSignal = signal[start:endTrain]
         testSignal = signal[endTrain:endTest]
 
+        #print(trainSignal.shape)
+        #print(testSignal.shape)
         data['train'] = trainSignal
         data['test'] = testSignal
         allSegs.append(data)
@@ -61,6 +66,9 @@ def calcMetrics(xhat,x):
 
     return mse,l2,linf
 
+def plotMetrics():
+    pass
+
 def forecast(x,L,HOP,extK,extM):
 
     """
@@ -71,24 +79,39 @@ def forecast(x,L,HOP,extK,extM):
     extM: length of segments used for forecasting
     """
 
-    sigma2 = 200
+    sigma2 = 100
     X = np.zeros((int(np.ceil(extM/HOP)),extK)) # sets up matrix for EDMD estimation
-    print(X.shape)
+    #x = np.hstack([xTrain,xTest])
+    
+
+    ## of length at least extM+ 2*extK
     for kk in range(extK):
-        start = -1-extK-extM+kk
-        end = -1-extK+kk-1
-       
-        data = x[start:HOP:end]
+        start = -extK - extM +kk
+        end = kk - extK
+        #print(start)
+        #print(end)
+        #
         #### TO DO ####
         # fix this part.
         ###############
+        #print(start)
+        #print(end)
+        #print(x.shape)
+        data = x[start:end:HOP]
+        #if len(data) < extM: print(kk)
+        #print(HOP)
 
-        X[:,kk] = x[-1-extK-extM+kk:HOP:-1-extK+kk-1]
-    Y = np.hstack([X[:,2:], x[-1-extM+1:HOP:]])
+        X[:,kk] = x[start:end:HOP]
 
+
+    A = X[:,1:]
+    B = x[-extM::HOP,None]
+    
+    Y = np.hstack([A, B])
+    
     [Xi,mu,phix] = approximate_koopman(X,Y,sigma2)
 
-    Z = np.zeros((np.ceil(extM/HOP),L))
+    Z = np.zeros((round(np.ceil(extM/HOP)),L))
     tmp = phix.T
     for kk in range(L):
         tmp = mu * tmp
@@ -98,9 +121,6 @@ def forecast(x,L,HOP,extK,extM):
 
     return xext
 
-def plotMetrics():
-    pass
-
 
 if __name__ == "__main__":
 
@@ -109,17 +129,18 @@ if __name__ == "__main__":
     timePleth,sigPleth,fsPleth = loadData("Pleth.csv") 
     
     HOP = 1
-    extSEC = 0.1 # extension length in seconds
+    extSEC = 5 # extension length in seconds
     assert fsPleth == fsEEG
-    L = np.round(extSEC * fsEEG)
-    extM = 750
-    extK = int(np.round( 3.75*L )) # number of points to estimate A / size of datasets
-    extKSecs = ( 3.75*L/fsEEG )
+    L = round(extSEC * fsEEG)
+    extM = round(1.5 * L)
+    extK = round( 2.5*extM ) # number of points to estimate A / size of datasets
+    extKSecs = ( extK/fsEEG )
+    extMSecs = (extM/fsEEG)
     eegData = splitData(timeEEG,sigEEG,fsEEG,\
-                        train_segment_length=extKSecs,\
+                        train_segment_length=extKSecs + extMSecs,\
                         test_segment_length=extSEC)
     plethData = splitData(timePleth,sigPleth,fsPleth,\
-                        train_segment_length=extKSecs,\
+                        train_segment_length=extKSecs + extMSecs,\
                         test_segment_length=extSEC)
 
     eegStats = []
