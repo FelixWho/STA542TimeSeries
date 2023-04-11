@@ -23,6 +23,7 @@ class RobustEDMD:
         self.sigma_2 = sigma_2
 
     def update_koopman_and_forecast_point(self, new_data):
+        # This is all wrong
         # Kernel trick
         phi_t_phi = np.exp(-1/self.sigma_2 * distance.squareform(distance.pdist(new_data)))
 
@@ -54,14 +55,6 @@ class RobustEDMD:
         SigmaPINV = np.sqrt(Sigma2)
 
         # Got the koopman eigenvalues
-
-
-
-
-
-        
-
-
 
 def main():
     pass
