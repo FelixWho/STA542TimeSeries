@@ -12,6 +12,7 @@ class RobustEDMD:
     '''
     Please be mindful of the sampling rate. 
     Too fast of a rate might not give RobustEDMD enough time to update Koopman operator.
+    Might want to keep M < 100
     '''
     def __init__(self, M, delta=0.5, sigma_2=100):
         '''
@@ -24,6 +25,7 @@ class RobustEDMD:
         self.G_hat_inv = 1/delta * np.identity(M) # initialize as 1/delta * identity matrix
         self.K = self.G_hat_inv @ self.A # This should just equal the M x M 0-matrix, but whatever
         self.sigma_2 = sigma_2
+        self.M = M
 
     def update_koopman_and_forecast_point(self, x, y):
         '''
@@ -36,17 +38,16 @@ class RobustEDMD:
         self.A has shape M x M
 
         '''
-        M = np.shape(x)[0]
-
-        assert np.shape(y)[0] == M
+        assert np.shape(x)[0] == self.M
+        assert np.shape(y)[0] == self.M
 
         Uxy = np.vstack([x, y])
 
         # Kernel trick
         tmp = np.exp(-1/self.sigma_2 * distance.squareform(distance.pdist(Uxy)))
 
-        phix_phix_t = tmp[:M, :M]
-        phiy_phix_t = tmp[M:, :M]
+        phix_phix_t = tmp[:self.M, :self.M]
+        phiy_phix_t = tmp[self.M:, :self.M]
 
         # Based off Sinha et al.
         # Compute the denominator of G_hat_inv_m+1

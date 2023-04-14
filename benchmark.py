@@ -10,7 +10,7 @@ from scipy.linalg import pinvh
 def np_jit_pinv(A):
   return np_pinv(A)
 
-matrix = np.random.rand(300, 300)
+matrix = np.random.rand(100, 100)
 for pinv in [np_pinv, np_jit_pinv, jnp.linalg.pinv, np.linalg.inv]:
     start = time.time()
     pinv(matrix)
