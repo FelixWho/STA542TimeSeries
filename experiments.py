@@ -157,11 +157,11 @@ def online_forecast(x,L,HOP,extK,extM):
 
     redmd = RobustEDMD(extM)
 
-    for i in range(extK):
+    for i in range(1000):
         start_time = time.time()
         redmd.update_koopman_and_forecast_point(X[:, [i]], Y[:, [i]])
         print(f"ONLINE ITERATION TIME TAKEN: {time.time() -  start_time}")
-        print(redmd.ready)
+        print(f"{redmd.timestep} {redmd.ready}")
 
     print(redmd.forecasts)
 

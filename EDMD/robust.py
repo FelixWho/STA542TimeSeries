@@ -15,7 +15,7 @@ class RobustEDMD:
     Too fast of a rate might not give RobustEDMD enough time to update Koopman operator.
     Might want to keep M < 100
     '''
-    def __init__(self, M, delta=0.5, sigma_2=100, extension_length=150):
+    def __init__(self, M, delta=0.5, sigma_2=100, extension_length=50):
         '''
         M: data window, X = [x_1, ..., x_M]
         delta: regularization parameter
@@ -80,8 +80,6 @@ class RobustEDMD:
         assert x.shape[0] == self.M
         assert y.shape == x.shape
 
-        print(y.shape)
-
         Uxy = np.vstack([x, y])
 
         # Kernel trick
@@ -131,13 +129,17 @@ class RobustEDMD:
 
             forecast = self.forecast_point(xi, mu, Phixy[-1, :])
             self.forecasts[self.timestep + self.extention_length] = forecast.item()
+            print(forecast)
 
     def forecast_point(self, xi, mu, phi_end):
         '''
         Forecast single point self.extension_length out into the future
         '''
 
+        print(np.isnan(xi).any(), np.isnan(mu).any(), np.isnan(phi_end).any())
+
         tmp = phi_end.T
+        print(tmp.shape, mu.shape, xi.T.shape)
         for kk in range(self.extention_length):
             tmp = mu * tmp
 
