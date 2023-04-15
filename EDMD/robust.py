@@ -128,7 +128,7 @@ class RobustEDMD:
             xi = np.linalg.pinv(Phixy) @ Uxy
 
             forecast = self.forecast_point(xi, mu, Phixy[-1, :])
-            self.forecasts[self.timestep] = forecast.item()
+            self.forecasts[self.timestep + self.extention_length] = forecast.item()
 
     def forecast_point(self, xi, mu, phi_end):
         '''
