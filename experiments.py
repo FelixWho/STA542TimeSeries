@@ -124,6 +124,8 @@ def forecast(x,L,HOP,extK,extM):
 
     # X = [x1 x2 x3 ... ]
     # Z = [x1' x2' x3'...]
+
+    start_time_ext = time.time()
     Z = np.zeros((round(np.ceil(extM/HOP)),L), dtype="complex_")
     tmp = phix.T
     for kk in range(L):
@@ -132,6 +134,7 @@ def forecast(x,L,HOP,extK,extM):
 
     P = np.real(Xi.T @ Z)
     xext = P[-1,:].T
+    print(f"EXTENTION TIME TAKEN FOR {L} INCREMENTS: {time.time() - start_time_ext}")
 
     return xext
 
@@ -160,13 +163,11 @@ if __name__ == "__main__":
     eegStats = []
     plethStats = []
 
-    
-
     for seg in eegData:
 
         start_time = time.time()
         xExt = forecast(seg['train'],L,HOP,extK,extM)
-        print(f"TIME TAKEN: {time.time() -  start_time}")
+        print(f"FORECASTING TIME TAKEN: {time.time() -  start_time}")
 
         metrics = calcMetrics(xExt,seg['test']) 
         eegStats.append(metrics)

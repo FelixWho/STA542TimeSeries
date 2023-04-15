@@ -96,12 +96,11 @@ class RobustEDMD:
         # (v, 1/lambda) is an eigenvector, eigenvalue pair of G_hat_inv
         Sigma2, Q = np.linalg.eig(self.G_hat_inv)
         SigmaPINV = np.sqrt(Sigma2)
-        SigmaPINV_diag = np.diag(SigmaPINV)
 
         # Get the koopman eigenfunctions
         Uga = np.vstack([self.G_hat, self.A])
 
-        Phixy = Uga @ Q @ SigmaPINV_diag @ Vhat
+        Phixy = Uga @ np.multiply(Q, SigmaPINV) @ Vhat
 
         # Get the koopman modes
         xi = np.linalg.pinv(Phixy) @ Uxy
