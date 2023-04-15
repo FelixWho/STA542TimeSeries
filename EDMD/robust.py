@@ -6,6 +6,7 @@ Update: I think this is a better rendition of online Koopman, without regulariza
 import math
 import numpy as np
 from scipy.spatial import distance
+from collections import defaultdict
 
 
 class RobustEDMD:
@@ -14,7 +15,7 @@ class RobustEDMD:
     Too fast of a rate might not give RobustEDMD enough time to update Koopman operator.
     Might want to keep M < 100
     '''
-    def __init__(self, M, delta=0.5, sigma_2=100):
+    def __init__(self, M, delta=0.5, sigma_2=100, extension_length=100):
         '''
         M: data window, X = [x_1, ..., x_M]
         delta: regularization parameter
@@ -26,28 +27,44 @@ class RobustEDMD:
         self.K = self.G_hat_inv @ self.A # This should just equal the M x M 0-matrix, but whatever
         self.sigma_2 = sigma_2
         self.M = M
+        self.extention_length = extension_length
+        self.delta = delta
 
         self.timestep = 0
         self.ready = False
 
+        self.forecasts = defaultdict(float) # Map timestamp --> forecasted value
+
     def initialize(self, xp: np.ndarray, yp: np.ndarray):
         """
-        Initialize online DMD with first p (p >= self.M) snapshot pairs stored in (xp, yp)
-        Usage: odmd.initialize(xp, yp)
+        Let's try not to use this...
+        Initialize online EDMD with first p (p >= self.M) snapshot pairs stored in (xp, yp)
         Args:
             xp (np.ndarray): 2D array, shape (self.M, p), matrix [x(1),x(2),...x(p)]
             yp (np.ndarray): 2D array, shape (self.M, p), matrix [y(1),y(2),...y(p)]
         """
         assert xp.shape == yp.shape
+        p = xp.shape[1]
+        
+        Uxy = np.vstack([xp, yp])
 
-        p = xp.shape[0]
+        tmp = distance.pdist(Uxy, 'sqeuclidean')
+        
+        Uga = np.exp(-1/self.sigma_2 * distance.squareform(tmp))
+        Uga = Uga[:, 0:self.M]
 
+        self.G_hat = Uga[0:self.M, :]
+        self.A = Uga[self.M: , :self.M]
+
+        self.G_hat_inv = np.linalg.pinv(self.G_hat + np.diag(np.full(self.M, self.delta)))
+
+        self.K = self.G_hat_inv @ self.A
 
         self.timestep += p
 
         if self.timestep >= 2 * self.M:
             self.ready = True
-        
+
 
     def update_koopman_and_forecast_point(self, x, y):
         '''
@@ -86,29 +103,44 @@ class RobustEDMD:
         
         # Update Koopman operator K_m --> K_m+1
         self.K = self.G_hat_inv @ self.A
-        
-        # Forecast new data point using updated Koopman operator
-        # Based off Hua et al.
-        mu, Vhat = np.linalg.eig(self.K) # mu is koopman eigenvalues
-
-        # We need to find Sigma2, Q = eig(G_hat), but we only have G_hat_inv <--- EDIT: we do actually track G_hat, my bad
-        # Linear algebra fact: for every eigenvector, eigenvalue pair (v, lambda) of G_hat,
-        # (v, 1/lambda) is an eigenvector, eigenvalue pair of G_hat_inv
-        Sigma2, Q = np.linalg.eig(self.G_hat_inv)
-        SigmaPINV = np.sqrt(Sigma2)
-
-        # Get the koopman eigenfunctions
-        Uga = np.vstack([self.G_hat, self.A])
-
-        Phixy = Uga @ np.multiply(Q, SigmaPINV) @ Vhat
-
-        # Get the koopman modes
-        xi = np.linalg.pinv(Phixy) @ Uxy
 
         self.timestep += 1
-
         if self.timestep >= 2 * self.M:
             self.ready = True
+
+        if self.ready:
+            # Forecast new data point using updated Koopman operator
+            # Based off Hua et al.
+            mu, Vhat = np.linalg.eig(self.K) # mu is koopman eigenvalues
+
+            # We need to find Sigma2, Q = eig(G_hat), but we only have G_hat_inv <--- EDIT: we do actually track G_hat, my bad
+            # Linear algebra fact: for every eigenvector, eigenvalue pair (v, lambda) of G_hat,
+            # (v, 1/lambda) is an eigenvector, eigenvalue pair of G_hat_inv
+            Sigma2, Q = np.linalg.eig(self.G_hat_inv)
+            SigmaPINV = np.sqrt(Sigma2)
+
+            # Get the koopman eigenfunctions
+            Uga = np.vstack([self.G_hat, self.A])
+
+            Phixy = Uga @ np.multiply(Q, SigmaPINV) @ Vhat
+
+            # Get the koopman modes
+            xi = np.linalg.pinv(Phixy) @ Uxy
+
+            forecast = self.forecast_point(xi, mu, Phixy[-1, :])
+            self.forecasts[self.timestep] = forecast.item()
+
+    def forecast_point(self, xi, mu, phi_end):
+        '''
+        Forecast single point self.extension_length out into the future
+        '''
+
+        tmp = phi_end.T
+        for kk in range(self.extention_length):
+            tmp = mu * tmp
+
+        forecast = np.real(xi.T @ tmp)
+        return forecast
 
 
 def main():

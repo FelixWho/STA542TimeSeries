@@ -116,18 +116,18 @@ def forecast(x,L,HOP,extK,extM):
 
 
     A = X[:,1:]
-    B = x[-extM::HOP,None]
+    B = x[-extM::HOP, None]
     
     Y = np.hstack([A, B])
     
-    [Xi,mu,phix] = approximate_koopman(X,Y,sigma2)
+    [Xi,mu,phi_end] = approximate_koopman(X,Y,sigma2)
 
     # X = [x1 x2 x3 ... ]
     # Z = [x1' x2' x3'...]
 
     start_time_ext = time.time()
     Z = np.zeros((round(np.ceil(extM/HOP)),L), dtype="complex_")
-    tmp = phix.T
+    tmp = phi_end.T
     for kk in range(L):
         tmp = mu * tmp
         Z[:,kk] = tmp

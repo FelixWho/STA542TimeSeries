@@ -19,7 +19,7 @@ def approximate_koopman(x, y, sigma_2):
        phi_end: Koopman eigen functions
     '''
 
-    m = np.size(x, 0)
+    m = x.shape[0]
     
     Uxy = np.vstack([x, y[-1, :]])
 
