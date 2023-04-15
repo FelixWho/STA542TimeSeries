@@ -1,0 +1,453 @@
+---
+title: "Presentation"
+author: "Tiger Luo"
+date: "2/21/2023"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyr)
+library(dplyr)
+library(tibble)
+library(purrr)
+library(httr)
+library(ROCR)
+library(ggplot2)
+library(caret)
+library(corrplot)
+library(gridExtra)
+library(ResourceSelection)
+library(psych)
+library(bspec)
+library(pracma)
+library(ggpmisc)
+```
+
+## R Markdown
+
+```{r}
+ppg <- read.csv("Pleth.csv")
+eeg <- read.csv("F4M1.csv")
+ppg <- ppg[,1:2]
+eeg <- eeg[,1:2]
+```
+
+```{r}
+head(ppg)
+head(eeg)
+```
+
+
+
+
+
+```{r}
+quantile(eeg$X.1,c(0.005,0.995))
+sum(abs(eeg$X.1)<100)/length(abs(eeg$X.1)<100)
+sum(abs(eeg$X.1)<200)/length(abs(eeg$X.1)<200)
+```
+
+```{r}
+ggplot(eeg, aes(x = abs(X.1), fill = "red")) +
+  geom_density(alpha = 0.5) +
+  ggtitle("Density Plot of Single Channel EEG") +
+  xlab("Amplitude") +
+  ylab("Density") + 
+  geom_vline(xintercept = quantile(abs(eeg$X.1), 0.99), linetype = "dashed") +
+  annotate("text", x = quantile(abs(eeg$X.1), 0.99), y = 0.05, label = "99th percentile", angle = 90, vjust = 0)
+```
+
+
+```{r}
+missing_index <- which(abs(eeg$X.1)>100)
+# missing_index <- which(eeg$X.1>mean(eeg$X.1)+3*sd(eeg$X.1) | eeg$X.1<mean(eeg$X.1)-3*sd(eeg$X.1))
+missing_groups <- cumsum(c(1, abs(missing_index[-length(missing_index)] - missing_index[-1]) > 200))
+missing_df <- data.frame(id = missing_index, group=missing_groups)
+## table(missing_df$group)
+```
+
+```{r}
+missing_1 <- c()
+for (i in unique(missing_df$group)){
+  group_df = missing_df[missing_df$group==i,]
+  head_id = min(group_df$id) - 100
+  tail_id = max(group_df$id) + 100
+  missing_1 = append(missing_1,head_id:tail_id) 
+}
+length(missing_1)/length(eeg$X.1)
+```
+```{r}
+par(mfrow=c(1,2))
+eeg_diff = diff(eeg$X.1)
+boxplot(eeg_diff)
+boxplot(diff(eeg$X.1[-missing_1]))
+```
+
+```{r}
+ggplot(data.frame(x = eeg_diff), aes(x = abs(x), fill = "red")) +
+  geom_density(alpha = 0.5) +
+  ggtitle("Density Plot of Derivative of EEG") +
+  xlab("Amplitude") +
+  ylab("Density") +
+  geom_vline(xintercept = quantile(abs(eeg_diff), 0.99), linetype = "dashed") +
+  annotate("text", x = quantile(abs(eeg_diff), 0.99), y = 0.05, label = "99th percentile", angle = 90, vjust = 0)
+```
+```{r}
+quantile(abs(eeg_diff), 0.99)
+mean(abs(eeg_diff)) + 3 * sd(abs(eeg_diff))
+mean(eeg_diff) + 3 * sd(eeg_diff)
+```
+
+```{r}
+chunk_size <- 200
+n_chunks <- ceiling(length(eeg_diff) / chunk_size)
+chunk_mean <- numeric(n_chunks)
+chunk_sd <- numeric(n_chunks)
+for (i in 1:n_chunks) {
+  start_index <- (i - 1) * chunk_size + 1
+  end_index <- min(i * chunk_size, length(eeg_diff))
+  current_chunk <- eeg_diff[start_index:end_index]
+  
+  chunk_mean[i] <- mean(abs(current_chunk))
+  chunk_sd[i] <- sd(abs(current_chunk))
+}
+```
+
+
+```{r}
+diff_mean <- mean(chunk_mean)
+diff_sd <- sd(chunk_mean)
+
+mean_threshold_upper <- diff_mean + 3 * diff_sd
+mean_threshold_lower <- diff_mean - 3 * diff_sd
+
+diff_sd_mean <- mean(chunk_sd)
+diff_sd_sd <- sd(chunk_sd)
+
+sd_threshold_upper <- diff_sd_mean + 3 * diff_sd_sd
+sd_threshold_lower <- diff_sd_mean - 3 * diff_sd_sd
+
+abnormal_chunks_mean <- which(chunk_mean > mean_threshold_upper | chunk_mean < mean_threshold_lower)
+abnormal_chunks_sd <- which(chunk_sd > sd_threshold_upper | chunk_sd < sd_threshold_lower)
+combined_abnormal_chunks <- unique(c(abnormal_chunks_mean, abnormal_chunks_sd))
+```
+
+```{r}
+# chuck_test = abnormal_chunks_sd[2]
+chuck_test = 19321
+test_df = eeg[((chuck_test-2)*200) :((chuck_test+1)*200) ,]
+ggplot(test_df, aes(x = X, y = X.1)) +
+  geom_line()
+```
+
+```{r}
+# missing_index <- which(abs(eeg_diff)>100)
+# ## missing_index <- which(eeg_diff>mean(eeg_diff) + 3 * sd(eeg_diff) | eeg_diff<mean(eeg_diff) - 3 * sd(eeg_diff))
+# missing_groups <- cumsum(c(1, abs(missing_index[-length(missing_index)] - missing_index[-1]) > 200))
+# missing_df <- data.frame(id = missing_index, group=missing_groups)
+# ## table(missing_df$group)
+```
+
+```{r}
+# missing_2 <- c()
+# for (i in unique(missing_df$group)){
+#   group_df = missing_df[missing_df$group==i,]
+#   head_id = min(group_df$id) - 100
+#   tail_id = max(group_df$id) + 100
+#   missing_2 = append(missing_2,head_id:tail_id) 
+# }
+# length(missing_2)/length(eeg$X.1)
+```
+
+
+```{r}
+missing_2 <- c()
+
+for (chunk_id in combined_abnormal_chunks) {
+  start_index <- (chunk_id - 1) * chunk_size + 1
+  end_index <- min(chunk_id * chunk_size, length(eeg_diff))
+  
+  missing_2 <- c(missing_2, start_index:end_index)
+}
+
+# If you want to remove the entire 200-point chunk from the original eeg, add 1 to each index to account for the difference in length between eeg and eeg_diff
+missing_2 <- missing_2 + 1
+```
+
+
+```{r}
+unique_missing_2 <- setdiff(missing_2, missing_1)
+length(unique_missing_2)
+```
+
+
+```{r}
+small_diff <- abs(eeg_diff) < 0.5
+rle_result <- rle(small_diff)
+long_runs_indices <- which(rle_result$lengths > 50 & rle_result$values == TRUE)
+ending_indices <- cumsum(rle_result$lengths)[long_runs_indices] + 1
+starting_indices <- ending_indices - rle_result$lengths[long_runs_indices]
+starting_indices
+ending_indices
+```
+
+```{r}
+missing_2.2 = c()
+for (i in seq_along(starting_indices)){
+  if (starting_indices[i]>100){
+    head_id = starting_indices[i]-100
+  }
+  else {
+    head_id = 1
+  }
+  if (ending_indices[i]<(length(eeg)-100)){
+    tail_id = ending_indices[i]+100
+  }
+  else {
+    tail_id = ending_indices[i]
+  }
+  missing_2.2 = append(missing_2.2,head_id:tail_id) 
+}
+length(missing_2.2)/length(eeg$X.1)
+```
+
+```{r}
+unique_missing_2.2 <- setdiff(missing_2.2, c(missing_1,unique_missing_2))
+length(unique_missing_2.2)
+```
+
+```{r}
+clean_eeg = eeg
+clean_eeg$missing1 = 0
+clean_eeg$missing1[missing_1] = 1
+clean_eeg$missing2 = 0
+clean_eeg$missing2[missing_2] = 1
+clean_eeg$missing2.2 = 0
+clean_eeg$missing2.2[missing_2.2] = 1
+clean_eeg$missing_combine = clean_eeg$missing1 | clean_eeg$missing2 | clean_eeg$missing2.2
+clean_eeg$X.1.clean = clean_eeg$X.1
+clean_eeg$X.1.clean[clean_eeg$missing1 == 1 | clean_eeg$missing2 == 1 | clean_eeg$missing2.2 == 1] <- NA
+sum(is.na(clean_eeg$X.1.clean))/length(clean_eeg$X.1.clean)
+```
+
+
+
+```{r}
+# test_df = clean_eeg[00000 :10000 ,]
+# test_df = clean_eeg[10000 :20000 ,]
+test_df = clean_eeg[20000 :30000 ,]
+# test_df = clean_eeg[30000 :40000 ,]
+# test_df = clean_eeg[0000 :40000 ,]
+# test_df = clean_eeg[40000 :42500 ,]
+# test_df = clean_eeg[30000 :32500 ,]
+ggplot(test_df, aes(x = X, y = X.1)) +
+  geom_line(color = ifelse(test_df$missing_combine, "red", "black"))
+```
+```{r}
+test_df = clean_eeg[30000 :32000 ,]
+test_df = clean_eeg[28000 :30000 ,]
+ggplot(test_df, aes(x = X, y = X.1)) +
+  geom_line(color = ifelse(test_df$missing_combine, "red", "black"))
+```
+
+```{r}
+sampling_rate <- 200
+clean_duration <- 10 * sampling_rate
+noisy_duration <- 9 * sampling_rate
+
+clean_eeg_list <- list()
+noisy_eeg_list <- list()
+
+start_index <- 1
+
+while (start_index <= (nrow(clean_eeg) - clean_duration + 1)) {
+  # Check if the current segment is clean
+  if (all(clean_eeg[start_index:(start_index + clean_duration - 1), "missing_combine"] == 0)) {
+    clean_eeg_list[[length(clean_eeg_list) + 1]] <- clean_eeg[start_index:(start_index + clean_duration - 1), "X.1"]
+    
+    # Move the start index to the next segment
+    start_index <- start_index + clean_duration
+  } else {
+    # Check if the current segment is noisy
+    if (all(clean_eeg[start_index:(start_index + noisy_duration - 1), "missing_combine"] == 0) && any(clean_eeg[(start_index + noisy_duration):(start_index + clean_duration - 1), "missing_combine"] == 1)) {
+      noisy_eeg_list[[length(noisy_eeg_list) + 1]] <- clean_eeg[start_index:(start_index + clean_duration - 1), "X.1"]
+      
+      # Move the start index to the next segment
+      start_index <- start_index + clean_duration
+    } else {
+      # Move the start index to the next second
+      start_index <- start_index + sampling_rate
+    }
+  }
+}
+
+# Convert the lists to data frames
+clean_eeg_signal <- do.call(cbind, clean_eeg_list) %>% as.data.frame()
+noisy_eeg_signal <- do.call(cbind, noisy_eeg_list) %>% as.data.frame()
+
+
+```
+
+```{r}
+clean_eeg_signal
+```
+
+```{r}
+test_df = data.frame(time = seq(0, 10 - 0.005, by = 0.005), X = clean_eeg_signal[, 499])
+ggplot(test_df, aes(x = time, y = X)) +
+  geom_line()
+```
+
+
+```{r}
+test_df = data.frame(time = seq(0, 10 - 0.005, by = 0.005), X = noisy_eeg_signal[, 40])
+ggplot(test_df, aes(x = time, y = X)) +
+  geom_line()
+```
+
+
+```{r}
+write.csv(clean_eeg_signal, "clean_eeg_signal.csv", row.names=FALSE)
+write.csv(noisy_eeg_signal, "noisy_eeg_signal.csv", row.names=FALSE)
+```
+
+
+
+
+
+
+
+```{r}
+ggplot(ppg, aes(x = abs(X.1), fill = "red")) +
+  geom_density(alpha = 0.5) +
+  ggtitle("Density Plot of Single Channel EEG") +
+  xlab("Amplitude") +
+  ylab("Density") + 
+  geom_vline(xintercept = quantile(abs(eeg$X.1), 0.99), linetype = "dashed") +
+  annotate("text", x = quantile(abs(eeg$X.1), 0.99), y = 0.05, label = "99th percentile", angle = 90, vjust = 0)
+```
+```{r}
+# missing_index <- which(abs(ppg$X.1)>100)
+missing_index <- which(ppg$X.1>mean(ppg$X.1)+3*sd(ppg$X.1) | ppg$X.1<mean(ppg$X.1)-3*sd(ppg$X.1))
+missing_groups <- cumsum(c(1, abs(missing_index[-length(missing_index)] - missing_index[-1]) > 200))
+missing_df <- data.frame(id = missing_index, group=missing_groups)
+# table(missing_df$group)
+
+missing_1 <- c()
+for (i in unique(missing_df$group)){
+  group_df = missing_df[missing_df$group==i,]
+  head_id = min(group_df$id) - 100
+  tail_id = max(group_df$id) + 100
+  missing_1 = append(missing_1,head_id:tail_id) 
+}
+length(missing_1)/length(ppg$X.1)
+```
+
+```{r}
+threshold <- 10
+local_maxima_indices <- findpeaks(ppg$X.1,threshold)
+local_minima_indices <- findpeaks(-ppg$X.1)
+# Get the actual values of the maxima and minima
+local_maxima <- ppg$X.1[local_maxima_indices]
+local_minima <- ppg$X.1[local_minima_indices]
+# Calculate the differences between consecutive maxima and minima
+max_diff <- diff(local_maxima)
+min_diff <- diff(local_minima)
+# Set the threshold for detecting artifacts (customize as needed)
+max_threshold <- 100  # Threshold for the difference between maxima
+min_threshold <- 100  # Threshold for the difference between minima
+# Identify potential artifacts
+artifact_max_indices <- which(max_diff > max_threshold)
+artifact_min_indices <- which(min_diff > min_threshold)
+
+```
+
+```{r}
+# https://stats.stackexchange.com/questions/22974/how-to-find-local-peaks-valleys-in-a-series-of-data
+my_find_peaks <- function(x, m = 3) {
+  shape <- diff(sign(diff(x, na.pad = FALSE)))
+  pks <- sapply(which(shape < 0), FUN = function(i) {
+    z <- i - m + 1
+    z <- ifelse(z > 0, z, 1)
+    w <- i + m + 1
+    w <- ifelse(w < length(x), w, length(x))
+    if (all(x[c(z:i, (i + 2):w)] <= x[i + 1])) return(i + 1) else return(numeric(0))
+  })
+  pks <- unlist(pks)
+  pks
+}
+```
+
+```{r}
+testsig = cos(seq(0,5,by= 0.005))
+
+my_find_peaks(testsig,m=2)
+```
+
+
+```{r}
+testsig = ppg$X.1[0000:6000]
+# testsig = c(1:10, 9:-5, -8:6, 8:10, 4:0)
+# testsig
+peaks(testsig, span = 4)
+```
+
+```{r}
+test_df = clean_ppg[2000:2600  ,]
+ggplot(test_df, aes(x = 2000:2600, y = X.1)) +
+  geom_line(color = ifelse(test_df$missing_combine, "red", "black"))
+```
+
+
+
+
+
+```{r}
+ppg_diff = diff(ppg$X.1)
+small_diff <- abs(ppg_diff) < 0.5
+rle_result <- rle(small_diff)
+long_runs_indices <- which(rle_result$lengths > 50 & rle_result$values == TRUE)
+ending_indices <- cumsum(rle_result$lengths)[long_runs_indices] + 1
+starting_indices <- ending_indices - rle_result$lengths[long_runs_indices]
+starting_indices
+ending_indices
+```
+```{r}
+missing_2.2 = c()
+for (i in seq_along(starting_indices)){
+  if (starting_indices[i]>100){
+    head_id = starting_indices[i]-100
+  }
+  else {
+    head_id = 1
+  }
+  if (ending_indices[i]<(length(eeg)-100)){
+    tail_id = ending_indices[i]+100
+  }
+  else {
+    tail_id = ending_indices[i]
+  }
+  missing_2.2 = append(missing_2.2,head_id:tail_id) 
+}
+length(missing_2.2)/length(ppg$X.1)
+```
+
+```{r}
+clean_ppg = ppg
+clean_ppg$missing1 = 0
+clean_ppg$missing1[missing_1] = 1
+# clean_eeg$missing2 = 0
+# clean_eeg$missing2[missing_2] = 1
+clean_ppg$missing2.2 = 0
+clean_ppg$missing2.2[missing_2.2] = 1
+clean_ppg$missing_combine = clean_ppg$missing1 | clean_ppg$missing2.2
+#  | clean_ppg$missing2
+```
+
+
+```{r}
+test_df = clean_ppg[0000:4000  ,]
+ggplot(test_df, aes(x = X, y = X.1)) +
+  geom_line(color = ifelse(test_df$missing_combine, "red", "black"))
+```
