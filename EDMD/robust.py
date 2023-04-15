@@ -1,6 +1,6 @@
 '''
 Hua et al. kernel trick EDMD combined with Sinha et al. Online Robust Koopman https://arxiv.org/pdf/2212.05259.pdf
-Update: I think this is a better rendition of online Koopman: https://arxiv.org/pdf/1909.12520.pdf
+Update: I think this is a better rendition of online Koopman, without regularization parameter: https://arxiv.org/pdf/1909.12520.pdf
 '''
 
 import math
@@ -27,6 +27,28 @@ class RobustEDMD:
         self.sigma_2 = sigma_2
         self.M = M
 
+        self.timestep = 0
+        self.ready = False
+
+    def initialize(self, xp: np.ndarray, yp: np.ndarray):
+        """
+        Initialize online DMD with first p (p >= self.M) snapshot pairs stored in (xp, yp)
+        Usage: odmd.initialize(xp, yp)
+        Args:
+            xp (np.ndarray): 2D array, shape (self.M, p), matrix [x(1),x(2),...x(p)]
+            yp (np.ndarray): 2D array, shape (self.M, p), matrix [y(1),y(2),...y(p)]
+        """
+        assert xp.shape == yp.shape
+
+        p = xp.shape[0]
+
+
+        self.timestep += p
+
+        if self.timestep >= 2 * self.M:
+            self.ready = True
+        
+
     def update_koopman_and_forecast_point(self, x, y):
         '''
         x is column vector with shape M x 1: [x1, ..., xM]
@@ -36,15 +58,15 @@ class RobustEDMD:
         phix_phix_t/phiy_phix_t have shape M x M
         self.G_hat/self.G_hat_inv has shape M x M
         self.A has shape M x M
-
         '''
-        assert np.shape(x)[0] == self.M
-        assert np.shape(y)[0] == self.M
+
+        assert x.shape[0] == self.M
+        assert y.shape == x.shape
 
         Uxy = np.vstack([x, y])
 
         # Kernel trick
-        tmp = np.exp(-1/self.sigma_2 * distance.squareform(distance.pdist(Uxy)))
+        tmp = np.exp(-1/self.sigma_2 * distance.squareform(distance.pdist(Uxy, 'sqeuclidean')))
 
         phix_phix_t = tmp[:self.M, :self.M]
         phiy_phix_t = tmp[self.M:, :self.M]
@@ -78,10 +100,16 @@ class RobustEDMD:
 
         # Get the koopman eigenfunctions
         Uga = np.vstack([self.G_hat, self.A])
-        Phixy = Uga @ Q @ SigmaPINV_diag @ Vhat # TODO: I'm actually unsure about the dimensionality of Q, SigmaPINV
+
+        Phixy = Uga @ Q @ SigmaPINV_diag @ Vhat
 
         # Get the koopman modes
         xi = np.linalg.pinv(Phixy) @ Uxy
+
+        self.timestep += 1
+
+        if self.timestep >= 2 * self.M:
+            self.ready = True
 
 
 def main():

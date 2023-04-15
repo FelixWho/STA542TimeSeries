@@ -21,9 +21,9 @@ def approximate_koopman(x, y, sigma_2):
 
     m = np.size(x, 0)
     
-    Uxy = np.vstack([x, y])
+    Uxy = np.vstack([x, y[-1, :]])
 
-    tmp = distance.pdist(Uxy)
+    tmp = distance.pdist(Uxy, 'sqeuclidean')
     
     Uga = np.exp(-1/sigma_2 * distance.squareform(tmp))
     Uga = Uga[:, 0:m]
@@ -31,12 +31,13 @@ def approximate_koopman(x, y, sigma_2):
     Ghat = Uga[0:m, :]
     Ahat = Uga[1:(m+1), :]
 
-    # Unlike Matlab, sigma2 returned by eig() should be a vector instead of a matrix
+    # Unlike Matlab, sigma2 returned by np.linalg.eig() should be a vector instead of a matrix
     sigma2, Q = np.linalg.eig(Ghat)
 
     SigmaPINV = 1./np.sqrt(sigma2)
 
-    Mtmp = Q * np.transpose(SigmaPINV)
+    Mtmp = np.multiply(Q, SigmaPINV) # <==> Q * np.transpose(SigmaPINV) since * is element-wise I think
+
     KoopMat = np.transpose(Mtmp) @ Ahat @ Mtmp
 
     mu, Vhat = np.linalg.eig(KoopMat)

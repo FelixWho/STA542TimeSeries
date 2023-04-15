@@ -3,7 +3,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import time
 
-from EDMD.hua import approximate_koopman
+from EDMD.window import approximate_koopman
+from EDMD.robust import RobustEDMD
 
 def loadData(filepath): 
     """
@@ -123,7 +124,7 @@ def forecast(x,L,HOP,extK,extM):
 
     # X = [x1 x2 x3 ... ]
     # Z = [x1' x2' x3'...]
-    Z = np.zeros((round(np.ceil(extM/HOP)),L))
+    Z = np.zeros((round(np.ceil(extM/HOP)),L), dtype="complex_")
     tmp = phix.T
     for kk in range(L):
         tmp = mu * tmp
@@ -147,7 +148,7 @@ if __name__ == "__main__":
     L = round(extSEC * fsEEG)
     extM = round(1.5 * L)
     extK = round( 2.5 * extM ) # number of points to estimate A / size of datasets
-    extKSecs = ( extK/fsEEG )
+    extKSecs = (extK/fsEEG )
     extMSecs = (extM/fsEEG)
     eegData = splitData(timeEEG,sigEEG,fsEEG,\
                         train_segment_length=extKSecs + extMSecs,\
@@ -159,6 +160,8 @@ if __name__ == "__main__":
     eegStats = []
     plethStats = []
 
+    
+
     for seg in eegData:
 
         start_time = time.time()
@@ -168,6 +171,9 @@ if __name__ == "__main__":
         metrics = calcMetrics(xExt,seg['test']) 
         eegStats.append(metrics)
 
+        print(f"mse {metrics[0]}, l2 {metrics[1]}, linf {metrics[2]}")
+
+    '''
     plotMetrics(eegStats)
     for seg in plethData:
 
@@ -176,3 +182,6 @@ if __name__ == "__main__":
         metrics = calcMetrics(xExt,seg['test']) 
         plethStats.append(metrics)
     plotMetrics(plethStats)
+    '''
+
+
