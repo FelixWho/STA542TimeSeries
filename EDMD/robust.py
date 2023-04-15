@@ -15,7 +15,7 @@ class RobustEDMD:
     Too fast of a rate might not give RobustEDMD enough time to update Koopman operator.
     Might want to keep M < 100
     '''
-    def __init__(self, M, delta=0.5, sigma_2=100, extension_length=100):
+    def __init__(self, M, delta=0.5, sigma_2=100, extension_length=150):
         '''
         M: data window, X = [x_1, ..., x_M]
         delta: regularization parameter
@@ -79,6 +79,8 @@ class RobustEDMD:
 
         assert x.shape[0] == self.M
         assert y.shape == x.shape
+
+        print(y.shape)
 
         Uxy = np.vstack([x, y])
 

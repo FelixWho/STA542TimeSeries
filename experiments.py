@@ -110,7 +110,7 @@ def forecast(x,L,HOP,extK,extM):
 
     ## of length at least extM + extK
     for kk in range(extK):
-        start = -extK - extM +kk
+        start = -extK - extM + kk
         end = kk - extK
         X[:,kk] = x[start:end:HOP]
 
@@ -138,6 +138,33 @@ def forecast(x,L,HOP,extK,extM):
 
     return xext
 
+def online_forecast(x,L,HOP,extK,extM):
+    X = np.zeros((int(np.ceil(extM/HOP)),extK)) # sets up matrix for EDMD estimation
+    #x = np.hstack([xTrain,xTest])
+    
+
+    ## of length at least extM + extK
+    for kk in range(extK):
+        start = -extK - extM + kk
+        end = kk - extK
+        X[:,kk] = x[start:end:HOP]
+
+
+    A = X[:,1:]
+    B = x[-extM::HOP, None]
+    
+    Y = np.hstack([A, B])
+
+    redmd = RobustEDMD(extM)
+
+    for i in range(extK):
+        start_time = time.time()
+        redmd.update_koopman_and_forecast_point(X[:, [i]], Y[:, [i]])
+        print(f"ONLINE ITERATION TIME TAKEN: {time.time() -  start_time}")
+        print(redmd.ready)
+
+    print(redmd.forecasts)
+
 
 if __name__ == "__main__":
 
@@ -162,7 +189,7 @@ if __name__ == "__main__":
 
     eegStats = []
     plethStats = []
-
+    '''
     for seg in eegData:
 
         start_time = time.time()
@@ -174,7 +201,6 @@ if __name__ == "__main__":
 
         print(f"mse {metrics[0]}, l2 {metrics[1]}, linf {metrics[2]}")
 
-    '''
     plotMetrics(eegStats)
     for seg in plethData:
 
@@ -185,4 +211,6 @@ if __name__ == "__main__":
     plotMetrics(plethStats)
     '''
 
-
+    for seg in eegData:
+        online_forecast(seg['train'],L,HOP,extK,100)
+        break
