@@ -40,7 +40,7 @@ def approximate_koopman(x, y, sigma_2):
 
     Mtmp = np.multiply(Q, SigmaPINV) # <==> Q * np.transpose(SigmaPINV) since * is element-wise I think
 
-    KoopMat = np.transpose(Mtmp) @ Ahat @ Mtmp
+    KoopMat = Mtmp.T @ Ahat @ Mtmp
 
     mu, Vhat = np.linalg.eig(KoopMat)
 
@@ -48,6 +48,7 @@ def approximate_koopman(x, y, sigma_2):
 
     xi = np.linalg.pinv(Phixy) @ Uxy
 
+    #print(Phixy)
     phi_end = Phixy[-1, :]
 
     return xi, mu, phi_end

@@ -15,7 +15,7 @@ class RobustEDMD:
     Too fast of a rate might not give RobustEDMD enough time to update Koopman operator.
     Might want to keep M < 100
     '''
-    def __init__(self, M, delta=100, sigma_2=100, extension_length=50):
+    def __init__(self, M, delta=1, sigma_2=100, extension_length=50):
         '''
         M: data window, X = [x_1, ..., x_M]
         delta: regularization parameter
@@ -87,6 +87,7 @@ class RobustEDMD:
 
         phix_phix_t = tmp[:self.M, :self.M]
         phiy_phix_t = tmp[self.M:, :self.M]
+        phix_phiy_t = tmp[:self.M, self.M:]
 
         print("phiyphix_t shape: " + str(phiy_phix_t.shape))
 
@@ -101,11 +102,15 @@ class RobustEDMD:
         self.G_hat_inv -= (1/denom) * (self.G_hat_inv @ phix_phix_t @ self.G_hat_inv)
         
         # Compute updated A_m --> A_m+1
-        self.A += phiy_phix_t
+        self.A += phix_phiy_t
         
         # Update Koopman operator K_m --> K_m+1
         # It's possible that this is invalid
         self.K = self.G_hat_inv @ self.A
+        #Sigma2, Q = np.linalg.eig(self.G_hat_inv)
+        #SigmaPINV = np.sqrt(Sigma2)
+        #Mtmp = np.multiply(Q, SigmaPINV)
+        #self.K = Mtmp.T @ self.A @ Mtmp
 
         print("G inv norm: " + str(np.linalg.norm(self.G_hat_inv)))
         print("A norm: " + str(np.linalg.norm(self.A)))

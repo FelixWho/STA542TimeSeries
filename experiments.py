@@ -128,6 +128,7 @@ def forecast(x,L,HOP,extK,extM):
     start_time_ext = time.time()
     Z = np.zeros((round(np.ceil(extM/HOP)),L), dtype="complex_")
     tmp = phi_end.T
+    #print(tmp)
     for kk in range(L):
         tmp = mu * tmp
         Z[:,kk] = tmp
@@ -201,7 +202,7 @@ if __name__ == "__main__":
     eegStats = []
     plethStats = []
     
-    '''
+    
     for seg in eegData:
 
         start_time = time.time()
@@ -212,7 +213,19 @@ if __name__ == "__main__":
         eegStats.append(metrics)
 
         print(f"mse {metrics[0]}, l2 {metrics[1]}, linf {metrics[2]}")
+        #print(seg['train'])
+
+        plt.figure(1)
+        plt.subplot(211)
+        plt.plot(xExt)
+        plt.subplot(212)
+        plt.plot(seg['test'])
+        plt.show()
+
+
+        break
     
+    '''
     plotMetrics(eegStats)
     for seg in plethData:
 
@@ -223,6 +236,6 @@ if __name__ == "__main__":
     plotMetrics(plethStats)
     '''
 
-    for seg in eegData:
-        online_forecast(seg['train'],L,HOP,extK,100, seg['test'])
-        break
+    #for seg in eegData:
+    #    online_forecast(seg['train'],L,HOP,extK,100, seg['test'])
+    #    break
