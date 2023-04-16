@@ -16,6 +16,12 @@ def loadData(filepath):
     time = np.array(data.iloc[:,0])
     signal = np.array(data.iloc[:,1])
 
+    mu = np.nanmean(signal)
+    sigma = np.nanstd(signal)
+    #z-scoring data
+    signal = (signal - mu)/sigma
+
+
     dt = time[1] - time[0]
     fs = 1/dt
 
@@ -93,7 +99,7 @@ def plotMetrics(listOfMetrics):
     plt.savefig("test.png")
 
 
-def forecast(x,L,HOP,extK,extM):
+def forecast(x,L,HOP,extK,extM,backward=False):
 
     """
     takes as input x: signal to be forecasted
@@ -101,7 +107,11 @@ def forecast(x,L,HOP,extK,extM):
     HOP: subsampling rate for forecasting
     extK: size of dataset for forecasting
     extM: length of segments used for forecasting
+
+    can also do this backwards? it's in HT's code
     """
+    if backward:
+        x = np.flipud(x)
 
     sigma2 = 100
     X = np.zeros((int(np.ceil(extM/HOP)),extK)) # sets up matrix for EDMD estimation
@@ -137,6 +147,8 @@ def forecast(x,L,HOP,extK,extM):
     xext = P[-1,:].T
     print(f"EXTENTION TIME TAKEN FOR {L} INCREMENTS: {time.time() - start_time_ext}")
 
+    if backward:
+        xext = np.flipud(xext)
     return xext
 
 def online_forecast(x,L,HOP,extK,extM, test):
@@ -185,7 +197,7 @@ if __name__ == "__main__":
     timePleth,sigPleth,fsPleth = loadData("Pleth.csv")
     
     HOP = 1
-    extSEC = 5 # extension length in seconds
+    extSEC = 3 # extension length in seconds
     assert fsPleth == fsEEG
     L = round(extSEC * fsEEG)
     extM = round(1.5 * L)
@@ -205,10 +217,17 @@ if __name__ == "__main__":
     
     for seg in eegData:
 
+        timeT = np.linspace(0,extKSecs + extMSecs,int((extKSecs + extMSecs)*fsEEG))
+        timeTe = np.linspace(extKSecs + extMSecs,extKSecs + extMSecs + extSEC,int((extSEC)*fsEEG))
         start_time = time.time()
         xExt = forecast(seg['train'],L,HOP,extK,extM)
         print(f"FORECASTING TIME TAKEN: {time.time() -  start_time}")
-
+        ax = plt.gca()
+        plt.plot(timeT,seg['train'])
+        plt.plot(timeTe,seg['test'],color='r')
+        plt.plot(timeTe,xExt,color='b')
+        plt.show()
+        assert False
         metrics = calcMetrics(xExt,seg['test']) 
         eegStats.append(metrics)
 
@@ -234,7 +253,7 @@ if __name__ == "__main__":
         metrics = calcMetrics(xExt,seg['test']) 
         plethStats.append(metrics)
     plotMetrics(plethStats)
-    '''
+    
 
     #for seg in eegData:
     #    online_forecast(seg['train'],L,HOP,extK,100, seg['test'])

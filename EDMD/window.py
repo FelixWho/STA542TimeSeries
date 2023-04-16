@@ -23,7 +23,8 @@ def approximate_koopman(x, y, sigma_2):
     
     Uxy = np.vstack([x, y[-1, :]])
 
-    tmp = distance.pdist(Uxy, 'sqeuclidean')
+    # changed from sqeuclidean to euclidean
+    tmp = distance.pdist(Uxy, 'euclidean')
     
     Uga = np.exp(-1/sigma_2 * distance.squareform(tmp))
     Uga = Uga[:, 0:m]
