@@ -15,7 +15,7 @@ class RobustEDMD:
     Too fast of a rate might not give RobustEDMD enough time to update Koopman operator.
     Might want to keep M < 100
     '''
-    def __init__(self, M, delta=0.5, sigma_2=100, extension_length=50):
+    def __init__(self, M, delta=100, sigma_2=100, extension_length=50):
         '''
         M: data window, X = [x_1, ..., x_M]
         delta: regularization parameter
@@ -53,7 +53,7 @@ class RobustEDMD:
         Uga = np.exp(-1/self.sigma_2 * distance.squareform(tmp))
         Uga = Uga[:, 0:self.M]
 
-        self.G_hat = Uga[0:self.M, :]
+        self.G_hat = Uga[:self.M, :]
         self.A = Uga[self.M: , :self.M]
 
         self.G_hat_inv = np.linalg.pinv(self.G_hat + np.diag(np.full(self.M, self.delta)))
@@ -88,9 +88,11 @@ class RobustEDMD:
         phix_phix_t = tmp[:self.M, :self.M]
         phiy_phix_t = tmp[self.M:, :self.M]
 
+        print("phiyphix_t shape: " + str(phiy_phix_t.shape))
+
         # Based off Sinha et al.
         # Compute the denominator of G_hat_inv_m+1
-        denom = 1 + np.sum(np.transpose(phix_phix_t) @ self.G_hat_inv)
+        denom = 1 + np.sum(phix_phix_t @ self.G_hat_inv)
 
         # Compute updated G_hat_m --> G_hat_m+1
         self.G_hat += phix_phix_t
@@ -102,7 +104,12 @@ class RobustEDMD:
         self.A += phiy_phix_t
         
         # Update Koopman operator K_m --> K_m+1
+        # It's possible that this is invalid
         self.K = self.G_hat_inv @ self.A
+
+        print("G inv norm: " + str(np.linalg.norm(self.G_hat_inv)))
+        print("A norm: " + str(np.linalg.norm(self.A)))
+        print("K norm: " + str(np.linalg.norm(self.K)))
 
         self.timestep += 1
         if self.timestep >= 2 * self.M:
@@ -139,7 +146,6 @@ class RobustEDMD:
         print(np.isnan(xi).any(), np.isnan(mu).any(), np.isnan(phi_end).any())
 
         tmp = phi_end.T
-        print(tmp.shape, mu.shape, xi.T.shape)
         for kk in range(self.extention_length):
             tmp = mu * tmp
 

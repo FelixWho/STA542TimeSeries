@@ -31,6 +31,8 @@ def approximate_koopman(x, y, sigma_2):
     Ghat = Uga[0:m, :]
     Ahat = Uga[1:(m+1), :]
 
+    # print("NORM OF K IS " + str(np.linalg.norm(np.linalg.pinv(Ghat) @ Ahat)))
+
     # Unlike Matlab, sigma2 returned by np.linalg.eig() should be a vector instead of a matrix
     sigma2, Q = np.linalg.eig(Ghat)
 

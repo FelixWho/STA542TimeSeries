@@ -138,7 +138,7 @@ def forecast(x,L,HOP,extK,extM):
 
     return xext
 
-def online_forecast(x,L,HOP,extK,extM):
+def online_forecast(x,L,HOP,extK,extM, test):
     X = np.zeros((int(np.ceil(extM/HOP)),extK)) # sets up matrix for EDMD estimation
     #x = np.hstack([xTrain,xTest])
     
@@ -165,6 +165,17 @@ def online_forecast(x,L,HOP,extK,extM):
 
     print(redmd.forecasts)
 
+    lists = sorted(redmd.forecasts.items()) # sorted by key, return a list of tuples
+
+    a, b = zip(*lists) # unpack a list of pairs into two tuples
+
+    plt.figure(1)
+    plt.subplot(211)
+    plt.plot(b)
+    plt.subplot(212)
+    plt.plot(test)
+    plt.show()
+
 
 if __name__ == "__main__":
 
@@ -189,6 +200,7 @@ if __name__ == "__main__":
 
     eegStats = []
     plethStats = []
+    
     '''
     for seg in eegData:
 
@@ -200,7 +212,7 @@ if __name__ == "__main__":
         eegStats.append(metrics)
 
         print(f"mse {metrics[0]}, l2 {metrics[1]}, linf {metrics[2]}")
-
+    
     plotMetrics(eegStats)
     for seg in plethData:
 
@@ -212,5 +224,5 @@ if __name__ == "__main__":
     '''
 
     for seg in eegData:
-        online_forecast(seg['train'],L,HOP,extK,100)
+        online_forecast(seg['train'],L,HOP,extK,100, seg['test'])
         break
