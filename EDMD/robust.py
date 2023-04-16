@@ -48,7 +48,7 @@ class RobustEDMD:
         
         Uxy = np.vstack([xp, yp])
 
-        tmp = distance.pdist(Uxy, 'sqeuclidean')
+        tmp = distance.pdist(Uxy, 'euclidean')
         
         Uga = np.exp(-1/self.sigma_2 * distance.squareform(tmp))
         Uga = Uga[:, 0:self.M]
@@ -83,7 +83,7 @@ class RobustEDMD:
         Uxy = np.vstack([x, y])
 
         # Kernel trick
-        tmp = np.exp(-1/self.sigma_2 * distance.squareform(distance.pdist(Uxy, 'sqeuclidean')))
+        tmp = np.exp(-1/self.sigma_2 * distance.squareform(distance.pdist(Uxy, 'euclidean')))
 
         phix_phix_t = tmp[:self.M, :self.M]
         phiy_phix_t = tmp[self.M:, :self.M]
