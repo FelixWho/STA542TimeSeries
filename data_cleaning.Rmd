@@ -289,9 +289,6 @@ noisy_eeg_signal <- do.call(cbind, noisy_eeg_list) %>% as.data.frame()
 
 ```
 
-```{r}
-clean_eeg_signal
-```
 
 ```{r}
 test_df = data.frame(time = seq(0, 10 - 0.005, by = 0.005), X = clean_eeg_signal[, 499])
@@ -308,7 +305,7 @@ ggplot(test_df, aes(x = time, y = X)) +
 
 
 ```{r}
-write.csv(clean_eeg_signal, "clean_eeg_signal.csv", row.names=FALSE)
+write.csv(clean_eeg_signal[,1:100], "clean_eeg_signal.csv", row.names=FALSE)
 write.csv(noisy_eeg_signal, "noisy_eeg_signal.csv", row.names=FALSE)
 ```
 
@@ -321,7 +318,7 @@ write.csv(noisy_eeg_signal, "noisy_eeg_signal.csv", row.names=FALSE)
 ```{r}
 ggplot(ppg, aes(x = abs(X.1), fill = "red")) +
   geom_density(alpha = 0.5) +
-  ggtitle("Density Plot of Single Channel EEG") +
+  ggtitle("Density Plot of Single Channel PPG") +
   xlab("Amplitude") +
   ylab("Density") + 
   geom_vline(xintercept = quantile(abs(eeg$X.1), 0.99), linetype = "dashed") +
@@ -345,60 +342,131 @@ length(missing_1)/length(ppg$X.1)
 ```
 
 ```{r}
-threshold <- 10
-local_maxima_indices <- findpeaks(ppg$X.1,threshold)
-local_minima_indices <- findpeaks(-ppg$X.1)
-# Get the actual values of the maxima and minima
-local_maxima <- ppg$X.1[local_maxima_indices]
-local_minima <- ppg$X.1[local_minima_indices]
-# Calculate the differences between consecutive maxima and minima
-max_diff <- diff(local_maxima)
-min_diff <- diff(local_minima)
-# Set the threshold for detecting artifacts (customize as needed)
-max_threshold <- 100  # Threshold for the difference between maxima
-min_threshold <- 100  # Threshold for the difference between minima
-# Identify potential artifacts
-artifact_max_indices <- which(max_diff > max_threshold)
-artifact_min_indices <- which(min_diff > min_threshold)
+find_extrema <- function(ppg_signal, span, min_change) {
+  local_maxima <- c()
+  local_minima <- c()
+  i <- span + 1
 
-```
+  while (i <= length(ppg_signal) - span) {
+    window <- ppg_signal[(i - span):(i + span)]
+    max_val <- max(window)
+    min_val <- min(window)
 
-```{r}
-# https://stats.stackexchange.com/questions/22974/how-to-find-local-peaks-valleys-in-a-series-of-data
-my_find_peaks <- function(x, m = 3) {
-  shape <- diff(sign(diff(x, na.pad = FALSE)))
-  pks <- sapply(which(shape < 0), FUN = function(i) {
-    z <- i - m + 1
-    z <- ifelse(z > 0, z, 1)
-    w <- i + m + 1
-    w <- ifelse(w < length(x), w, length(x))
-    if (all(x[c(z:i, (i + 2):w)] <= x[i + 1])) return(i + 1) else return(numeric(0))
-  })
-  pks <- unlist(pks)
-  pks
+    # Check if there's a significant change in the signal
+    if (max_val - min_val >= min_change) {
+      if (ppg_signal[i] == max_val) {
+        local_maxima <- c(local_maxima, i)
+        i <- i + span
+      } else if (ppg_signal[i] == min_val) {
+        local_minima <- c(local_minima, i)
+        i <- i + span
+      } else {
+        i <- i + 1
+      }
+    } else {
+      i <- i + 1
+    }
+  }
+
+  return(list(local_maxima = local_maxima, local_minima = local_minima))
 }
 ```
 
-```{r}
-testsig = cos(seq(0,5,by= 0.005))
-
-my_find_peaks(testsig,m=2)
-```
-
 
 ```{r}
-testsig = ppg$X.1[0000:6000]
-# testsig = c(1:10, 9:-5, -8:6, 8:10, 4:0)
-# testsig
-peaks(testsig, span = 4)
-```
+abnormal_peaks <- c()
+abnormal_notches <- c()
 
+extrema = find_extrema(ppg$X.1,span=30,min_change=20)
+
+maxima_values <- ppg$X.1[extrema$local_maxima]
+minima_values <- ppg$X.1[extrema$local_minima]
+
+max_mean <- mean(maxima_values)
+max_sd <- sd(maxima_values)
+min_mean <- mean(minima_values)
+min_sd <- sd(minima_values)
+
+# Set threshold for abnormal detection
+threshold <- 3
+
+max_peak = 90
+min_peak = 10
+# Identify abnormal peaks and notches based on their values and intervals
+abnormal_peak_values <- extrema$local_maxima[which((maxima_values > max_peak) | 
+                                                   (maxima_values < min_peak))]
+abnormal_notch_values <- extrema$local_minima[which((minima_values > -min_peak) | 
+                                                     (minima_values < -max_peak))]
+
+# Combine the results
+abnormal_peaks <- unique(c(abnormal_peak_values, abnormal_peak_intervals))
+abnormal_notches <- unique(c(abnormal_notch_values, abnormal_notch_intervals))
+
+combined_abnormal_extrema <- sort(c(abnormal_peaks, abnormal_notches))
+
+# Create a list with 100 index values before and after each abnormal extrema
+extrema_ranges <- lapply(combined_abnormal_extrema, function(extrema) {
+  start_index <- max(extrema - 100, 1)
+  end_index <- min(extrema + 100, length(ppg$X))
+  seq(start_index, end_index)
+})
+
+# Flatten the list into a vector and remove duplicates
+missing_1 <- unique(unlist(extrema_ranges))
+length(missing_1)/length(ppg$X.1)
+```
 ```{r}
-test_df = clean_ppg[2000:2600  ,]
-ggplot(test_df, aes(x = 2000:2600, y = X.1)) +
-  geom_line(color = ifelse(test_df$missing_combine, "red", "black"))
-```
+sampling_rate <- 200
+interval_duration <- 10 * sampling_rate
+n_intervals <- ceiling(nrow(ppg) / interval_duration)
 
+# Calculate the mean and standard deviation for each interval
+interval_maxima_num <- numeric(n_intervals)
+interval_maxima_sd <- numeric(n_intervals)
+interval_minima_num <- numeric(n_intervals)
+interval_minima_sd <- numeric(n_intervals)
+
+for (i in seq(1, nrow(ppg), by = interval_duration)) {
+  interval_index <- ((i - 1) / interval_duration) + 1
+  interval_end <- min(i + interval_duration - 1, nrow(ppg))
+  interval_data <- ppg[i:interval_end, ]
+  
+  extrema <- find_extrema(interval_data$X.1, span = 25, min_change = 10)
+  
+  maxima_values <- interval_data$X.1[extrema$local_maxima]
+  minima_values <- interval_data$X.1[extrema$local_minima]
+  
+  interval_maxima_num[interval_index] <- length(maxima_values)
+  interval_maxima_sd[interval_index] <- sd(maxima_values)
+  interval_minima_num[interval_index] <- length(minima_values)
+  interval_minima_sd[interval_index] <- sd(minima_values)
+}
+
+# Remove NA values and calculate the overall mean and standard deviation
+mean_maxima_num <- mean(interval_maxima_num, na.rm = TRUE)
+mean_maxima_sd <- mean(interval_maxima_sd, na.rm = TRUE)
+mean_minima_num <- mean(interval_minima_num, na.rm = TRUE)
+mean_minima_sd <- mean(interval_minima_sd, na.rm = TRUE)
+
+# Compare each interval's values with the overall mean and standard deviation
+threshold <- 2
+abnormal_intervals <- which(
+  (abs(interval_maxima_num - mean_maxima_num) > threshold * sd(interval_maxima_num, na.rm = TRUE)) |
+  (abs(interval_maxima_sd - mean_maxima_sd) > threshold * sd(interval_maxima_sd, na.rm = TRUE)) |
+  (abs(interval_minima_num - mean_minima_num) > threshold * sd(interval_minima_num, na.rm = TRUE)) |
+  (abs(interval_minima_sd - mean_minima_sd) > threshold * sd(interval_minima_sd, na.rm = TRUE)) |
+  is.na(interval_maxima_sd) | is.na(interval_minima_sd)
+)
+
+# Label every index in the abnormal intervals as missing_2
+missing_2 <- unlist(lapply(abnormal_intervals, function(x) {
+  start <- (x - 1) * interval_duration + 1
+  end <- min(start + interval_duration - 1, nrow(ppg))
+  start:end
+}))
+
+length(missing_2)/length(ppg$X.1)
+```
 
 
 
@@ -422,7 +490,7 @@ for (i in seq_along(starting_indices)){
   else {
     head_id = 1
   }
-  if (ending_indices[i]<(length(eeg)-100)){
+  if (ending_indices[i]<(length(ppg)-100)){
     tail_id = ending_indices[i]+100
   }
   else {
@@ -437,17 +505,85 @@ length(missing_2.2)/length(ppg$X.1)
 clean_ppg = ppg
 clean_ppg$missing1 = 0
 clean_ppg$missing1[missing_1] = 1
-# clean_eeg$missing2 = 0
-# clean_eeg$missing2[missing_2] = 1
+ clean_ppg$missing2 = 0
+ clean_ppg$missing2[missing_2] = 1
 clean_ppg$missing2.2 = 0
 clean_ppg$missing2.2[missing_2.2] = 1
-clean_ppg$missing_combine = clean_ppg$missing1 | clean_ppg$missing2.2
-#  | clean_ppg$missing2
+clean_ppg$missing_combine = clean_ppg$missing1 | clean_ppg$missing2.2 | clean_ppg$missing2
+sum(clean_ppg$missing_combine)/nrow(clean_ppg)
 ```
 
 
 ```{r}
-test_df = clean_ppg[0000:4000  ,]
+# testid = abnormal_peaks[1000]    
+# test_df = clean_ppg[(testid-1500):(testid+1500)  ,]
+test_df = clean_ppg[4000:6000  ,]
+
+# Subset the data for the abnormal peaks and notches in the interval
+abnormal_peaks_data <- test_df[test_df$X %in% ppg$X[abnormal_peaks],]
+abnormal_notches_data <- test_df[test_df$X %in% ppg$X[abnormal_notches],]
+
+# Plot the data with highlighted abnormal peaks and notches
+ggplot(test_df, aes(x = X, y = X.1)) +
+  geom_line(color = ifelse(test_df$missing_combine, "red", "black")) +
+  geom_point(data = abnormal_peaks_data, aes(x = X, y = X.1), color = "red", size = 2) +
+  geom_point(data = abnormal_notches_data, aes(x = X, y = X.1), color = "blue", size = 2)
+```
+
+
+```{r}
+test_df = clean_ppg[(6160*200):(6180*200+1000)  ,]
 ggplot(test_df, aes(x = X, y = X.1)) +
   geom_line(color = ifelse(test_df$missing_combine, "red", "black"))
 ```
+
+```{r}
+sampling_rate <- 200
+clean_duration <- 10 * sampling_rate
+noisy_duration <- 9 * sampling_rate
+
+clean_ppg_list <- list()
+noisy_ppg_list <- list()
+
+start_index <- 1
+
+while (start_index <= (nrow(clean_ppg) - clean_duration + 1)) {
+  # Check if the current segment is clean
+  if (all(clean_ppg[start_index:(start_index + clean_duration - 1), "missing_combine"] == 0)) {
+    clean_ppg_list[[length(clean_ppg_list) + 1]] <- clean_ppg[start_index:(start_index + clean_duration - 1), "X.1"]
+    
+    # Move the start index to the next segment
+    start_index <- start_index + clean_duration
+  } else {
+    # Check if the current segment is noisy
+    if (all(clean_ppg[start_index:(start_index + noisy_duration - 1), "missing_combine"] == 0) && any(clean_ppg[(start_index + noisy_duration):(start_index + clean_duration - 1), "missing_combine"] == 1)) {
+      noisy_ppg_list[[length(noisy_ppg_list) + 1]] <- clean_ppg[start_index:(start_index + clean_duration - 1), "X.1"]
+      
+      # Move the start index to the next segment
+      start_index <- start_index + clean_duration
+    } else {
+      # Move the start index to the next second
+      start_index <- start_index + sampling_rate
+    }
+  }
+}
+
+# Convert the lists to data frames
+clean_ppg_signal <- do.call(cbind, clean_ppg_list) %>% as.data.frame()
+noisy_ppg_signal <- do.call(cbind, noisy_ppg_list) %>% as.data.frame()
+dim(clean_ppg_signal)
+dim(noisy_ppg_signal)
+```
+
+```{r}
+test_df = data.frame(time = seq(0, 10 - 0.005, by = 0.005), X = noisy_ppg_signal[, 16])
+ggplot(test_df, aes(x = time, y = X)) +
+  geom_line()
+```
+
+
+```{r}
+write.csv(clean_ppg_signal[,1:100], "clean_ppg_signal.csv", row.names=FALSE)
+write.csv(noisy_ppg_signal[,c(3,4,7:16)], "noisy_ppg_signal.csv", row.names=FALSE)
+```
+
